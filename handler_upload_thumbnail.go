@@ -72,7 +72,8 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	}
 
 	// read file
-	if _, err := io.ReadAll(file); err != nil {
+	data, err := io.ReadAll(file)
+	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't read thumbnail file", err)
 		return
 	}
@@ -89,19 +90,22 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	}
 
 	// save thumbnail to assets directory
-	thumbnailPath := filepath.Join(cfg.assetsRoot, fmt.Sprintf("%s.%s", videoID, extensions[0]))
+	thumbnailPath := filepath.Join(cfg.assetsRoot, fmt.Sprintf("%s%s", videoID, extensions[0]))
 	create, err := os.Create(thumbnailPath)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create thumbnail file", err)
 		return
 	}
-	if _, err := io.Copy(create, file); err != nil {
+	defer func() {
+		_ = create.Close()
+	}()
+	if _, err := create.Write(data); err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't write thumbnail file", err)
 		return
 	}
 
 	// update video metadata
-	thumbnailURL := fmt.Sprintf("http://localhost:%s/assets/%s.%s", cfg.port, videoID, extensions[0])
+	thumbnailURL := fmt.Sprintf("http://localhost:%s/assets/%s%s", cfg.port, videoID, extensions[0])
 	video.ThumbnailURL = &thumbnailURL
 	video.UpdatedAt = time.Now()
 	if err := cfg.db.UpdateVideo(video); err != nil {
