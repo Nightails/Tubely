@@ -13,6 +13,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
+	video2 "github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/video"
 	"github.com/google/uuid"
 )
 
@@ -98,6 +99,25 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// check for video's aspect ratio
+	var prefix string
+	ratio, err := video2.GetVideoAspectRatio(temp.Name())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't get video aspect ratio", err)
+		return
+	}
+	switch ratio {
+	default:
+		prefix = "other"
+		break
+	case "16:9":
+		prefix = "landscape"
+		break
+	case "9:16":
+		prefix = "portrait"
+		break
+	}
+
 	_, _ = temp.Seek(0, io.SeekStart)
 
 	// put object into s3
@@ -106,7 +126,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		respondWithError(w, http.StatusInternalServerError, "Couldn't generate video name", err)
 		return
 	}
-	filename := base64.RawURLEncoding.EncodeToString(randomBytes) + extensions[0]
+	filename := prefix + "/" + base64.RawURLEncoding.EncodeToString(randomBytes) + extensions[0]
 	if _, err := cfg.s3Client.PutObject(
 		r.Context(),
 		&s3.PutObjectInput{
