@@ -3,6 +3,7 @@ package video
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"os/exec"
 )
 
@@ -83,6 +84,9 @@ type Root struct {
 }
 
 func GetVideoAspectRatio(filePath string) (string, error) {
+	if filePath == "" {
+		return "", errors.New("file path cannot be empty")
+	}
 	cmd := exec.Command("ffprobe", "-v", "error", "-print_format", "json", "-show_streams", filePath)
 	outBuffer := bytes.NewBuffer([]byte{})
 	cmd.Stdout = outBuffer
@@ -97,4 +101,17 @@ func GetVideoAspectRatio(filePath string) (string, error) {
 
 	ratio := videoData.Streams[0].DisplayAspectRatio
 	return ratio, nil
+}
+
+func ProcessVideoForFastStart(filePath string) (string, error) {
+	if filePath == "" {
+		return "", errors.New("file path cannot be empty")
+	}
+	outPath := filePath + ".processing"
+	cmd := exec.Command("ffmpeg", "-i", filePath, "-c", "copy", "-movflags", "faststart", "-f", "mp4", outPath)
+	err := cmd.Run()
+	if err != nil {
+		return "", err
+	}
+	return outPath, nil
 }
